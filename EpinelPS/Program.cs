@@ -3,11 +3,9 @@ using EpinelPS.LobbyServer;
 using EpinelPS.Data;
 using EpinelPS.Utils;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using log4net.Config;
 
@@ -15,6 +13,8 @@ namespace EpinelPS
 {
     internal class Program
     {
+        private const string ServerIp = "160.202.238.223";
+        private const int ServerPort = 5010;
         static void Main(string[] args)
         {
             try
@@ -32,26 +32,17 @@ namespace EpinelPS
                 Logging.WriteLine("Register handlers");
                 LobbyHandler.Init();
 
-                Logging.WriteLine("Starting ASP.NET core on port 443");
+                Logging.WriteLine($"Starting ASP.NET core on http://{ServerIp}:{ServerPort}");  // Start web server in a new thread
                 new Thread(() =>
                 {
                     WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-                    // Configure HTTPS
-                    HttpsConnectionAdapterOptions httpsConnectionAdapterOptions = new()
-                    {
-                        SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
-                        ClientCertificateMode = ClientCertificateMode.AllowCertificate,
-                        ServerCertificate = new X509Certificate2(File.ReadAllBytes(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "site.pfx")))
-                    };
-
                     builder.WebHost.ConfigureKestrel(serverOptions =>
                     {
-                        serverOptions.Listen(IPAddress.Any, 443,
+                        serverOptions.Listen(IPAddress.Parse(ServerIp), ServerPort,
                             listenOptions =>
                             {
-                                listenOptions.Protocols = HttpProtocols.Http1AndHttp2AndHttp3;
-                                listenOptions.UseHttps(AppDomain.CurrentDomain.BaseDirectory + @"site.pfx", "");
+                                listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
                             });
 
                         // TODO
@@ -86,11 +77,7 @@ namespace EpinelPS
                     {
 
                     }
-
-                    app.UseHttpsRedirection();
-
                     app.UseAuthorization();
-                    app.UseHttpsRedirection();
                     app.UseRouting();
                     app.MapControllerRoute(
                name: "default",
@@ -214,7 +201,7 @@ namespace EpinelPS
                 else if (input == "?" || input == "help")
                 {
                     Console.WriteLine("EpinelPS CLI");
-                    Console.WriteLine("NOTICE: Admin panel is available at https://localhost/admin/");
+                    Console.WriteLine($"NOTICE: Admin panel is available at http://{ServerIp}:{ServerPort}/admin/");
                     Console.WriteLine();
                     Console.WriteLine("Commands:");
                     Console.WriteLine("  help - show this help");

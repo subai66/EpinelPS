@@ -1,5 +1,6 @@
 ﻿//#define GameAssemblyNeedsPatch // remove if running on versions before v124 or on v137+
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
@@ -10,6 +11,26 @@ public class ServerSwitcher
 {
     private const string HostsStartMarker = "# begin ServerSelector entries";
     private const string HostsEndMarker = "# end ServerSelector entries";
+    private static readonly string[] HostsEntries =
+    [
+        "global-lobby.nikke-kr.com",
+        "cloud.nikke-kr.com",
+        "jp-lobby.nikke-kr.com",
+        "us-lobby.nikke-kr.com",
+        "kr-lobby.nikke-kr.com",
+        "sea-lobby.nikke-kr.com",
+        "hmt-lobby.nikke-kr.com",
+        "aws-na-dr.intlgame.com",
+        "sg-vas.intlgame.com",
+        "aws-na.intlgame.com",
+        "na-community.playerinfinite.com",
+        "common-web.intlgame.com",
+        "li-sg.intlgame.com",
+        "na.fleetlogd.com",
+        "www.jupiterlauncher.com",
+        "data-aws-na.intlgame.com",
+        "sentry.io"
+    ];
 
     private static PathUtil util = new();
 
@@ -57,50 +78,50 @@ public class ServerSwitcher
 
     public static async Task RevertHostsFile(string hostsFilePath)
     {
-        string txt = await File.ReadAllTextAsync(hostsFilePath);
-
-        // remove stuff
-        try
+        string[] lines = await File.ReadAllLinesAsync(hostsFilePath);
+        int startIndex = -1;
+        int endIndex = -1;
+        for (int i = 0; i < lines.Length; i++)
         {
 
-            int startIdx = txt.IndexOf(HostsStartMarker);
-            int endIdx;
-            if (startIdx == -1)
+            if (startIndex == -1 && lines[i].Contains(HostsStartMarker, StringComparison.OrdinalIgnoreCase))
             {
-                startIdx = txt.IndexOf("cloud.nikke-kr.com");
+                startIndex = i;
+                continue;
             }
 
-            string endIndexStr = HostsEndMarker;
-            if (!txt.Contains(endIndexStr))
+            if (startIndex != -1 && lines[i].Contains(HostsEndMarker, StringComparison.OrdinalIgnoreCase))
             {
-                // old code, find new line character before start index
-                for (int i = startIdx - 1; i >= 0; i--)
-                {
-                    char c = txt[i];
-                    if (c == '\n')
-                    {
-                        startIdx = i + 1;
-                        break;
-                    }
-                }
-
-                endIndexStr = "y.io";
-                endIdx = txt.IndexOf(endIndexStr) + endIndexStr.Length;
+                endIndex = i;
+                break;
             }
-            else
-            {
-                // add/subtract 2 to take into account newline
-                startIdx = txt.IndexOf(HostsStartMarker) - 2;
-                endIdx = txt.IndexOf(endIndexStr) + endIndexStr.Length;
-            }
-
-            txt = string.Concat(txt.AsSpan(0, startIdx), txt.AsSpan(endIdx));
-
-
-            await File.WriteAllTextAsync(hostsFilePath, txt);
         }
-        catch
+
+        List<string> newLines = [];
+        bool changed = false;
+
+        for (int i = 0; i < lines.Length; i++)
         {
+            if (startIndex != -1 && endIndex != -1 && i >= startIndex && i <= endIndex)
+            {
+                changed = true;
+                continue;
+            }
+
+            if (lines[i].Contains(HostsStartMarker, StringComparison.OrdinalIgnoreCase)
+                || lines[i].Contains(HostsEndMarker, StringComparison.OrdinalIgnoreCase)
+                || ShouldRemoveHostLine(lines[i]))
+            {
+                changed = true;
+                continue;
+            }
+
+
+            newLines.Add(lines[i]);
+        }
+        if (changed)
+        {
+            await File.WriteAllLinesAsync(hostsFilePath, newLines);
 
         }
     }
@@ -268,6 +289,18 @@ public class ServerSwitcher
         }
 
         return new ServerSwitchResult(true, null, supported);
+    }
+    private static bool ShouldRemoveHostLine(string line)
+    {
+        foreach (string host in HostsEntries)
+        {
+            if (line.Contains(host, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
