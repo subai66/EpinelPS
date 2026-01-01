@@ -13,8 +13,8 @@ namespace EpinelPS
 {
     internal class Program
     {
-        private const string ServerIp = "160.202.238.223";
-        private const int ServerPort = 5010;
+        private const string ServerIp = "127.0.0.1";
+        private const int ServerPort = 443;
         static void Main(string[] args)
         {
             try
